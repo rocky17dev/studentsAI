@@ -1,0 +1,8 @@
+*Benvenuto nel bot multifunzionale!*
+
+Puoi utilizzare i seguenti comandi:
+- `/transcribe` - Trascrivi un file audio in testo.
+- `/clean` - Pulisci un file audio dai rumori di fondo.
+
+Usa `/cancel` per annullare un'operazione in corso.
+
