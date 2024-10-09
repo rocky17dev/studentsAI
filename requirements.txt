@@ -8,3 +8,5 @@ noisereduce==3.0.2
 scipy==1.13.0
 openai==1.17.0
 python-dotenv==1.0.1
+python-docx==0.8.11
+ffmpeg-python
