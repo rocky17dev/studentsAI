@@ -57,7 +57,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Errore durante la lettura del messaggio di benvenuto: {e}")
         welcome_message = "Benvenuto nel bot multifunzionale! Si è verificato un errore nel caricamento del messaggio di benvenuto."
 
-    await update.message.reply_text(welcome_message, parse_mode='MarkdownV2')
+    await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
 ######################
 # Trascrizione Audio #
