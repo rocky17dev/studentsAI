@@ -1,2 +1,2 @@
-[packages]
-system = ["ffmpeg"]
+[phases.setup]
+    nixPkgs = ['...', 'ffmpeg']
