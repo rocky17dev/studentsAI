@@ -1,6 +1,5 @@
-python-telegram-bot==21.6
+python-telegram-bot==20.0
 pydub==0.25.1
-docx==0.2.4
 numpy==1.26.4
 librosa==0.10.2.post1
 soundfile==0.12.1
@@ -9,4 +8,4 @@ scipy==1.13.0
 openai==1.17.0
 python-dotenv==1.0.1
 python-docx==0.8.11
-ffmpeg-python
+ffmpeg-python==0.2.0  # Opzionale
