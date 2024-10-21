@@ -1,2 +1,0 @@
-[pkgs]
-packages = ["ffmpeg", "python3", "gcc"]

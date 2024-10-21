@@ -2,6 +2,10 @@ from telegram.ext import Application, CommandHandler, ConversationHandler, Messa
 from bot.config import logger, get_openai_api_key, get_telegram_token, verify_ffmpeg
 from openai_utils.openai_helper import setup_openai
 from bot.handlers import (
+    TRANS_WAITING_FOR_AUDIO,
+    TRANS_WAITING_FOR_FILENAME,
+    CLEAN_WAITING_FOR_AUDIO,
+    CLEAN_WAITING_FOR_FILENAME,
     start,
     transcribe_command,
     clean_command,
