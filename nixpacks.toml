@@ -1,13 +1,2 @@
 [phases.setup]
 nixpkgs = ["ffmpeg", "python3", "pip"]
-
-[phases.install]
-commands = [
-  "pip install -r requirements.txt"
-]
-
-[phases.start]
-commands = [
-  "ffmpeg -version",  # Verifica che ffmpeg sia disponibile
-  "python -m bot.main"
-]
