@@ -1,8 +1,9 @@
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ConversationHandler
 from audio.audio_utils import clean_audio
 from openai_utils.openai_helper import transcribe_audio_with_whisper
 from bot.config import logger
+
 
 TRANS_WAITING_FOR_AUDIO, TRANS_WAITING_FOR_FILENAME = range(2)
 CLEAN_WAITING_FOR_AUDIO, CLEAN_WAITING_FOR_FILENAME = range(2)
