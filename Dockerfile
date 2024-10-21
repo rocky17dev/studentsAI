@@ -1,7 +1,7 @@
 # Usa un'immagine Python come base
 FROM python:3.10-slim
 
-# Installa ffmpeg direttamente nel container del bot
+# Installa ffmpeg
 RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
 
 # Crea una directory di lavoro
@@ -14,7 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia il resto del codice del progetto
 COPY . .
 
-# Esporta le variabili d'ambiente, che includeranno anche OpenAI API e Telegram Bot Token
+# Aggiungi la directory di lavoro al PYTHONPATH
+ENV PYTHONPATH=/app
+
+# Esporta le variabili d'ambiente
 ENV PYTHONUNBUFFERED=1
 
 # Comando per avviare l'app
