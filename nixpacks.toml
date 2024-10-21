@@ -1,14 +1,15 @@
 [phases.setup]
-aptPkgs =  ["python3", "pip"]
+nixpkgs = ["python3", "pip", "bash", "coreutils"]
 
 [phases.install]
 commands = [
   "apt-get update",
-  "apt-get install -y ffmpeg",  # Installazione di ffmpeg tramite apt
+  "apt-get install -y ffmpeg",  # Installa ffmpeg tramite apt-get
   "pip install -r requirements.txt"
 ]
 
 [phases.start]
 commands = [
-  "ffmpeg -version",  # Verifica che ffmpeg sia disponibile
+  "ffmpeg -version",  # Verifica l'installazione di ffmpeg
+  "python -m bot.main"  # Avvia il bot
 ]
