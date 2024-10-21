@@ -1,2 +1,14 @@
 [phases.setup]
-aptPkgs = ["ffmpeg", "python3", "pip"]
+aptPkgs =  ["python3", "pip"]
+
+[phases.install]
+commands = [
+  "apt-get update",
+  "apt-get install -y ffmpeg",  # Installazione di ffmpeg tramite apt
+  "pip install -r requirements.txt"
+]
+
+[phases.start]
+commands = [
+  "ffmpeg -version",  # Verifica che ffmpeg sia disponibile
+]
