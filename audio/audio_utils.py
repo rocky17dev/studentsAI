@@ -59,8 +59,10 @@ def clean_audio(file_path, output_filename, noise_factor=0.2, low_cutoff=300.0, 
         y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
         logger.info("Equalizzazione del segnale completata.")
 
-        # Salva l'audio pulito in un file MP3
-        output_path = os.path.join("tmp", output_filename)
+        # Aggiungi un'estensione al nome del file
+        output_path = os.path.join("tmp", f"{output_filename}.mp3")  # Usa un'estensione valida come .wav
+
+        # Salva l'audio pulito in un file WAV
         sf.write(output_path, y_filtered_lp, normalized_audio.frame_rate)
         logger.info(f"Audio pulito salvato: {output_path}")
         return output_path

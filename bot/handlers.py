@@ -102,14 +102,19 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['clean_filename'] = filename
     logger.info(f"Nome file ricevuto: {filename}")
 
+    await update.message.reply_text("Pulizia dell'audio in corso...")
+
     # Avvia la pulizia dell'audio (sincrona da audio_utils)
     cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename)
-    
+
     if cleaned_audio_path:
         logger.info(f"Pulizia dell'audio completata per {update.effective_user.first_name}. File salvato in {cleaned_audio_path}.")
+        await update.message.reply_text(f"Pulizia completata. Il file pulito è stato salvato come '{filename}.mp3'.")
+
         # Invia il file audio pulito
         with open(cleaned_audio_path, 'rb') as audio_file:
             await update.message.reply_audio(audio=audio_file)
+
         os.remove(cleaned_audio_path)
         os.remove(context.user_data['clean_audio_file_path'])
         logger.info(f"File audio temporaneo {cleaned_audio_path} rimosso.")
@@ -118,6 +123,7 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
         logger.error("Errore durante la pulizia dell'audio.")
     
     return ConversationHandler.END
+
 
 ##########################
 # Funzione di cancellazione #
