@@ -27,7 +27,7 @@ def butter_filter(data, lowcut, highcut, fs, btype='low'):
         return None
 
 # Funzione per pulire l'audio
-def clean_audio(file_path, output_filename, noise_factor=0.2, low_cutoff=300.0, high_cutoff=3400.0):
+def clean_audio(file_path, output_filename, noise_factor=0.1, low_cutoff=300.0, high_cutoff=3400.0):
     try:
         logger.info(f"Pulizia dell'audio iniziata per il file: {file_path}")
 
@@ -46,25 +46,32 @@ def clean_audio(file_path, output_filename, noise_factor=0.2, low_cutoff=300.0, 
         # Converti in un array NumPy
         y = np.array(normalized_audio.get_array_of_samples(), dtype=np.float32)
         y /= np.max(np.abs(y))  # Normalizza
-        logger.info("Audio convertito in formato NumPy e normalizzato.")
+        logger.info(f"Audio convertito in formato NumPy e normalizzato. Valore massimo: {np.max(y)}")
 
         # Riduzione del rumore
         logger.info(f"Riduzione del rumore con fattore di riduzione: {noise_factor}")
         y_denoised = nr.reduce_noise(y=y, sr=normalized_audio.frame_rate, prop_decrease=noise_factor)
-        logger.info("Riduzione del rumore completata.")
+        logger.info(f"Riduzione del rumore completata. Valore massimo: {np.max(y_denoised)}")
 
         # Equalizzazione del segnale
         logger.info("Inizio dell'equalizzazione del segnale.")
         y_filtered_hp = butter_filter(y_denoised, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='high')
+        logger.info(f"Filtro high-pass applicato. Valore massimo: {np.max(y_filtered_hp)}")
+
         y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
-        logger.info("Equalizzazione del segnale completata.")
+        logger.info(f"Filtro low-pass applicato. Valore massimo: {np.max(y_filtered_lp)}")
+
+        # Controlla se l'audio è silenzioso
+        if np.max(np.abs(y_filtered_lp)) == 0:
+            logger.error("Il segnale audio è completamente silenzioso, possibile problema nel processo.")
+            return None
 
         # Aggiungi un'estensione al nome del file
-        output_path = os.path.join("tmp", f"{output_filename}.mp3")  # Usa un'estensione valida come .wav
+        output_path = os.path.join("tmp", f"{output_filename}.wav")
 
         # Salva l'audio pulito in un file WAV
         sf.write(output_path, y_filtered_lp, normalized_audio.frame_rate)
-        logger.info(f"Audio pulito salvato: {output_path}")
+        logger.info(f"Audio pulito salvato correttamente: {output_path}")
         return output_path
 
     except Exception as e:
