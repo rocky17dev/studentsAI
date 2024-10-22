@@ -69,11 +69,11 @@ async def clean_handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("Non ho ricevuto un file audio. Riprova.")
         return CLEAN_WAITING_FOR_AUDIO
 
-    # Usa `await` correttamente per la chiamata asincrona a get_file()
+    # Usa `await` su `get_file()` perché è una coroutine
     file = await audio_file.get_file()
 
-    # Scarica il file audio
-    file_path = await file.download(custom_path="tmp/audio_to_clean.ogg")
+    # Scarica il file audio utilizzando `download_to_drive`
+    file_path = file.download_to_drive(custom_path="tmp/audio_to_clean.ogg")
     context.user_data['clean_audio_file_path'] = file_path
     logger.info(f"File audio salvato temporaneamente: {file_path}")
 
