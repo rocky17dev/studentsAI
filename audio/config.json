@@ -1,0 +1,6 @@
+{
+    "noise_factor": 0.2,
+    "low_cutoff": 300.0,
+    "high_cutoff": 3400.0,
+    "filter_type": "both"
+}

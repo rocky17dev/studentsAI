@@ -1,4 +1,5 @@
 import os
+import json
 import librosa
 import soundfile as sf
 import numpy as np
@@ -6,6 +7,17 @@ from scipy.signal import butter, filtfilt
 from pydub import AudioSegment
 import noisereduce as nr
 from bot.config import logger
+
+# Funzione per caricare la configurazione dal file JSON
+def load_config(config_file="config.json"):
+    try:
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+            logger.info(f"Configurazione caricata correttamente da {config_file}.")
+            return config
+    except Exception as e:
+        logger.error(f"Errore durante il caricamento della configurazione: {e}")
+        return None
 
 # Funzione per applicare filtri Butterworth
 def butter_filter(data, lowcut, highcut, fs, btype='low'):
@@ -27,8 +39,13 @@ def butter_filter(data, lowcut, highcut, fs, btype='low'):
         return None
 
 # Funzione per pulire l'audio
-def clean_audio(file_path, output_filename, noise_factor=0.1, low_cutoff=300.0, high_cutoff=3400.0):
+def clean_audio(file_path, output_filename, config):
     try:
+        noise_factor = config['noise_factor']
+        low_cutoff = config['low_cutoff']
+        high_cutoff = config['high_cutoff']
+        filter_type = config['filter_type']
+
         logger.info(f"Pulizia dell'audio iniziata per il file: {file_path}")
 
         # Carica il file audio
@@ -53,27 +70,44 @@ def clean_audio(file_path, output_filename, noise_factor=0.1, low_cutoff=300.0, 
         y_denoised = nr.reduce_noise(y=y, sr=normalized_audio.frame_rate, prop_decrease=noise_factor)
         logger.info(f"Riduzione del rumore completata. Valore massimo: {np.max(y_denoised)}")
 
-        # Equalizzazione del segnale
-        logger.info("Inizio dell'equalizzazione del segnale.")
-        y_filtered_hp = butter_filter(y_denoised, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='high')
-        logger.info(f"Filtro high-pass applicato. Valore massimo: {np.max(y_filtered_hp)}")
+        # Equalizzazione del segnale (filtri Butterworth)
+        if filter_type in ['high', 'both']:
+            logger.info("Inizio applicazione del filtro high-pass.")
+            y_filtered_hp = butter_filter(y_denoised, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='high')
+            logger.info(f"Filtro high-pass applicato. Valore massimo: {np.max(y_filtered_hp)}")
+        else:
+            y_filtered_hp = y_denoised
 
-        y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
-        logger.info(f"Filtro low-pass applicato. Valore massimo: {np.max(y_filtered_lp)}")
+        if filter_type in ['low', 'both']:
+            logger.info("Inizio applicazione del filtro low-pass.")
+            y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
+            logger.info(f"Filtro low-pass applicato. Valore massimo: {np.max(y_filtered_lp)}")
+        else:
+            y_filtered_lp = y_filtered_hp
 
         # Controlla se l'audio è silenzioso
         if np.max(np.abs(y_filtered_lp)) == 0:
             logger.error("Il segnale audio è completamente silenzioso, possibile problema nel processo.")
             return None
 
-        # Aggiungi un'estensione al nome del file
-        output_path = os.path.join("tmp", f"{output_filename}.wav")
+        # Aggiungi un'estensione MP3 al nome del file
+        output_path = os.path.join("tmp", f"{output_filename}.mp3")
 
-        # Salva l'audio pulito in un file WAV
-        sf.write(output_path, y_filtered_lp, normalized_audio.frame_rate)
-        logger.info(f"Audio pulito salvato correttamente: {output_path}")
+        # Salva l'audio pulito in un file MP3
+        cleaned_audio = AudioSegment.from_raw(file_path, sample_width=2, frame_rate=normalized_audio.frame_rate, channels=1)
+        cleaned_audio.export(output_path, format="mp3")
+        logger.info(f"Audio pulito salvato correttamente come MP3: {output_path}")
         return output_path
 
     except Exception as e:
         logger.error(f"Errore durante la pulizia dell'audio: {e}")
         return None
+
+# Esempio di utilizzo
+if __name__ == "__main__":
+    # Carica la configurazione dal file JSON
+    config = load_config("config.json")
+    
+    if config:
+        # Esegui la pulizia dell'audio con i parametri dalla configurazione
+        cleaned_audio_path = clean_audio('input_audio.wav', 'output_audio', config)
