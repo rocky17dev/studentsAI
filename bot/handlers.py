@@ -62,20 +62,25 @@ async def clean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Funzione per ricevere il file audio nella pulizia
 async def clean_handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Ricevuto file audio da {update.effective_user.first_name} per la pulizia.")
+    
     audio_file = update.message.audio or update.message.voice
 
     if not audio_file:
         await update.message.reply_text("Non ho ricevuto un file audio. Riprova.")
         return CLEAN_WAITING_FOR_AUDIO
 
-    # Salva il percorso del file temporaneo
-    file_path = await audio_file.get_file().download(custom_path="tmp/audio_to_clean.ogg")
+    # Usa `await` correttamente per la chiamata asincrona a get_file()
+    file = await audio_file.get_file()
+
+    # Scarica il file audio
+    file_path = await file.download(custom_path="tmp/audio_to_clean.ogg")
     context.user_data['clean_audio_file_path'] = file_path
     logger.info(f"File audio salvato temporaneamente: {file_path}")
 
     # Passa allo stato successivo per chiedere il nome del file
     await update.message.reply_text("Grazie! Ora per favore, inviami il nome che vuoi assegnare al file pulito.")
     return CLEAN_WAITING_FOR_FILENAME
+
 
 # Funzione per ricevere il nome del file e avviare la pulizia
 async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_TYPE):
