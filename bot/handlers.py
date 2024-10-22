@@ -1,3 +1,4 @@
+import os
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 from audio.audio_utils import clean_audio
@@ -88,7 +89,7 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['clean_filename'] = filename
     logger.info(f"Nome file ricevuto: {filename}")
 
-    # Avvia la pulizia dell'audio (funzione sincrona da audio_utils)
+    # Avvia la pulizia dell'audio (sincrona da audio_utils)
     cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename)
     
     if cleaned_audio_path:
