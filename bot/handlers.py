@@ -1,6 +1,7 @@
+import os
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
-from audio.audio_utils import clean_audio
+from audio.audio_utils import clean_audio, load_config
 from openai_utils.openai_helper import transcribe_audio_with_whisper
 from bot.config import logger
 
@@ -102,15 +103,18 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['clean_filename'] = filename
     logger.info(f"Nome file ricevuto: {filename}")
 
-    await update.message.reply_text("Pulizia dell'audio in corso...")
+    # Carica il file di configurazione
+    config = load_config()  # Assicurati che questa funzione sia stata importata
 
-    # Avvia la pulizia dell'audio (sincrona da audio_utils)
-    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename)
+    if config is None:
+        await update.message.reply_text("Errore nel caricamento della configurazione.")
+        return ConversationHandler.END
+
+    # Avvia la pulizia dell'audio passando il file di configurazione
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, config)
 
     if cleaned_audio_path:
         logger.info(f"Pulizia dell'audio completata per {update.effective_user.first_name}. File salvato in {cleaned_audio_path}.")
-        await update.message.reply_text(f"Pulizia completata. Il file pulito è stato salvato come '{filename}.mp3'.")
-
         # Invia il file audio pulito
         with open(cleaned_audio_path, 'rb') as audio_file:
             await update.message.reply_audio(audio=audio_file)
@@ -123,6 +127,7 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
         logger.error("Errore durante la pulizia dell'audio.")
     
     return ConversationHandler.END
+
 
 
 ##########################
