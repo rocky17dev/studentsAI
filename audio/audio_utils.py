@@ -1,5 +1,4 @@
 import os
-import json
 import librosa
 import soundfile as sf
 import numpy as np
@@ -7,26 +6,6 @@ from scipy.signal import butter, filtfilt
 from pydub import AudioSegment
 import noisereduce as nr
 from bot.config import logger
-
-# Funzione per caricare la configurazione dal file JSON
-def load_config(config_file="config.json"):
-    try:
-        # Ottieni il percorso assoluto del file di configurazione
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(base_dir, config_file)
-        
-        # Carica il file di configurazione
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-            logger.info(f"Configurazione caricata correttamente da {config_path}.")
-            return config
-    except FileNotFoundError:
-        logger.error(f"File di configurazione {config_file} non trovato nel percorso {config_path}.")
-        return None
-    except Exception as e:
-        logger.error(f"Errore durante il caricamento della configurazione: {e}")
-        return None
-
 
 # Funzione per applicare filtri Butterworth
 def butter_filter(data, lowcut, highcut, fs, btype='low'):
@@ -48,13 +27,12 @@ def butter_filter(data, lowcut, highcut, fs, btype='low'):
         return None
 
 # Funzione per pulire l'audio
-# Funzione per pulire l'audio
-def clean_audio(file_path, output_filename, config):
+def clean_audio(file_path, output_filename):
     try:
-        noise_factor = config['noise_factor']
-        low_cutoff = config['low_cutoff']
-        high_cutoff = config['high_cutoff']
-        filter_type = config['filter_type']
+        # Parametri predefiniti (si possono modificare per ottimizzare il risultato)
+        noise_factor = 0.2  # Fattore di riduzione del rumore
+        low_cutoff = 300.0  # Taglio frequenze basse
+        high_cutoff = 3000.0  # Taglio frequenze alte
 
         logger.info(f"Pulizia dell'audio iniziata per il file: {file_path}")
 
@@ -76,35 +54,36 @@ def clean_audio(file_path, output_filename, config):
         logger.info(f"Audio convertito in formato NumPy e normalizzato. Valore massimo: {np.max(y)}")
 
         # Riduzione del rumore
-        logger.info(f"Riduzione del rumore con fattore di riduzione: {noise_factor}")
+        logger.info(f"Riduzione del rumore in corso con fattore di riduzione: {noise_factor}")
         y_denoised = nr.reduce_noise(y=y, sr=normalized_audio.frame_rate, prop_decrease=noise_factor)
         logger.info(f"Riduzione del rumore completata. Valore massimo: {np.max(y_denoised)}")
 
-        # Equalizzazione del segnale (filtri Butterworth)
-        if filter_type in ['high', 'both']:
-            logger.info("Inizio applicazione del filtro high-pass.")
-            y_filtered_hp = butter_filter(y_denoised, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='high')
-            logger.info(f"Filtro high-pass applicato. Valore massimo: {np.max(y_filtered_hp)}")
-        else:
-            y_filtered_hp = y_denoised
+        # Applicazione dei filtri Butterworth per migliorare la qualità della voce
+        logger.info("Inizio applicazione del filtro high-pass.")
+        y_filtered_hp = butter_filter(y_denoised, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='high')
+        logger.info(f"Filtro high-pass applicato. Valore massimo: {np.max(y_filtered_hp)}")
 
-        if filter_type in ['low', 'both']:
-            logger.info("Inizio applicazione del filtro low-pass.")
-            y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
-            logger.info(f"Filtro low-pass applicato. Valore massimo: {np.max(y_filtered_lp)}")
-        else:
-            y_filtered_lp = y_filtered_hp
+        logger.info("Inizio applicazione del filtro low-pass.")
+        y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
+        logger.info(f"Filtro low-pass applicato. Valore massimo: {np.max(y_filtered_lp)}")
 
         # Controlla se l'audio è silenzioso
         if np.max(np.abs(y_filtered_lp)) == 0:
             logger.error("Il segnale audio è completamente silenzioso, possibile problema nel processo.")
             return None
 
+        # Converti di nuovo in formato AudioSegment per l'esportazione
+        cleaned_audio = AudioSegment(
+            y_filtered_lp.tobytes(), 
+            frame_rate=normalized_audio.frame_rate, 
+            sample_width=2, 
+            channels=1
+        )
+
         # Aggiungi un'estensione MP3 al nome del file
         output_path = os.path.join("tmp", f"{output_filename}.mp3")
 
         # Salva l'audio pulito in un file MP3
-        cleaned_audio = AudioSegment.from_raw(file_path, sample_width=2, frame_rate=normalized_audio.frame_rate, channels=1)
         cleaned_audio.export(output_path, format="mp3")
         logger.info(f"Audio pulito salvato correttamente come MP3: {output_path}")
         return output_path
@@ -115,9 +94,5 @@ def clean_audio(file_path, output_filename, config):
 
 # Esempio di utilizzo
 if __name__ == "__main__":
-    # Carica la configurazione dal file JSON
-    config = load_config("config.json")
-    
-    if config:
-        # Esegui la pulizia dell'audio con i parametri dalla configurazione
-        cleaned_audio_path = clean_audio('input_audio.wav', 'output_audio', config)
+    # Esegui la pulizia dell'audio senza file di configurazione
+    cleaned_audio_path = clean_audio('input_audio.wav', 'output_audio')
