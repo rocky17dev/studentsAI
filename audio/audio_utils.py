@@ -11,13 +11,22 @@ from bot.config import logger
 # Funzione per caricare la configurazione dal file JSON
 def load_config(config_file="config.json"):
     try:
-        with open(config_file, 'r') as f:
+        # Ottieni il percorso assoluto del file di configurazione
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(base_dir, config_file)
+        
+        # Carica il file di configurazione
+        with open(config_path, 'r') as f:
             config = json.load(f)
-            logger.info(f"Configurazione caricata correttamente da {config_file}.")
+            logger.info(f"Configurazione caricata correttamente da {config_path}.")
             return config
+    except FileNotFoundError:
+        logger.error(f"File di configurazione {config_file} non trovato nel percorso {config_path}.")
+        return None
     except Exception as e:
         logger.error(f"Errore durante il caricamento della configurazione: {e}")
         return None
+
 
 # Funzione per applicare filtri Butterworth
 def butter_filter(data, lowcut, highcut, fs, btype='low'):
