@@ -48,6 +48,7 @@ def butter_filter(data, lowcut, highcut, fs, btype='low'):
         return None
 
 # Funzione per pulire l'audio
+# Funzione per pulire l'audio
 def clean_audio(file_path, output_filename, config):
     try:
         noise_factor = config['noise_factor']
