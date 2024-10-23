@@ -1,7 +1,7 @@
 import os
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
-from audio.audio_utils import clean_audio, load_config
+from audio.audio_utils import clean_audio
 from openai_utils.openai_helper import transcribe_audio_with_whisper
 from bot.config import logger
 
@@ -103,15 +103,8 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['clean_filename'] = filename
     logger.info(f"Nome file ricevuto: {filename}")
 
-    # Carica il file di configurazione
-    config = load_config()  # Assicurati che questa funzione sia stata importata
-
-    if config is None:
-        await update.message.reply_text("Errore nel caricamento della configurazione.")
-        return ConversationHandler.END
-
     # Avvia la pulizia dell'audio passando il file di configurazione
-    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, config)
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename)
 
     if cleaned_audio_path:
         logger.info(f"Pulizia dell'audio completata per {update.effective_user.first_name}. File salvato in {cleaned_audio_path}.")
