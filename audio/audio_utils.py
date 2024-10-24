@@ -1,150 +1,155 @@
 import os
-import librosa
-import soundfile as sf
-import numpy as np
-from scipy.signal import butter, filtfilt
-from pydub import AudioSegment
-import noisereduce as nr
-from bot.config import logger, bot  # Assumendo che il bot sia istanziato qui
+from telegram import Update
+from telegram.ext import ContextTypes, ConversationHandler
+from utils import logger  # Logger importato da utils
+from bot.main import bot  # Assumendo che il bot sia istanziato qui
+from audio.audio_utils import clean_audio
+from openai_utils.openai_helper import transcribe_audio_with_whisper
 
+# Stati delle conversazioni
+TRANS_WAITING_FOR_AUDIO, TRANS_WAITING_FOR_FILENAME = range(2)
+CLEAN_WAITING_FOR_AUDIO, CLEAN_WAITING_FOR_FILENAME = range(2)
 
-# Funzione per applicare filtri Butterworth
-def butter_filter(data, lowcut, highcut, fs, btype='low'):
+##########################
+# Funzioni per il comando #
+##########################
+
+# Funzione per il comando /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Comando /start ricevuto da {update.effective_user.first_name}.")
     try:
-        nyq = 0.5 * fs
-        low = lowcut / nyq
-        high = highcut / nyq
-        if btype == 'band':
-            logger.info(f"Applicazione filtro Butterworth a banda con cutoff {lowcut}-{highcut} Hz.")
-            b, a = butter(4, [low, high], btype='band')
-        else:
-            logger.info(f"Applicazione filtro Butterworth {btype} con cutoff {lowcut if btype == 'low' else highcut} Hz.")
-            b, a = butter(4, low if btype == 'low' else high, btype=btype)
-        filtered_data = filtfilt(b, a, data)
-        logger.info(f"Filtro {btype} applicato con successo.")
-        return filtered_data
+        with open('welcome.txt', 'r', encoding='utf-8') as f:
+            welcome_message = f.read()
+        logger.info("Messaggio di benvenuto caricato con successo.")
     except Exception as e:
-        logger.error(f"Errore durante l'applicazione del filtro Butterworth: {e}")
-        return None
+        logger.error(f"Errore durante la lettura del messaggio di benvenuto: {e}")
+        welcome_message = "Benvenuto nel bot multifunzionale! Si è verificato un errore nel caricamento del messaggio di benvenuto."
 
-# Funzione per inviare log all'utente Telegram
-def send_log_to_user(user_id, message):
-    try:
-        bot.send_message(chat_id=user_id, text=message)
-    except Exception as e:
-        logger.error(f"Errore durante l'invio del messaggio all'utente: {e}")
+    await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
-# Funzione per inviare l'audio temporaneo all'utente
-def send_audio_to_user(user_id, audio_path, caption):
-    try:
-        bot.send_audio(chat_id=user_id, audio=open(audio_path, 'rb'), caption=caption)
-    except Exception as e:
-        logger.error(f"Errore durante l'invio dell'audio all'utente: {e}")
+######################
+# Trascrizione Audio #
+######################
 
+# Funzione per il comando /transcribe
+async def transcribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Comando /transcribe ricevuto da {update.effective_user.first_name}.")
+    await update.message.reply_text("Per favore, inviami il file audio che desideri trascrivere.")
+    return TRANS_WAITING_FOR_AUDIO
 
-# Funzione per pulire l'audio
-def clean_audio(file_path, output_filename, user_id):
-    try:
-        noise_factor = 0.2
-        low_cutoff = 300.0
-        high_cutoff = 3000.0
+# Funzione per ricevere il file audio nella trascrizione
+async def transcribe_handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Ricevuto file audio da {update.effective_user.first_name} per la trascrizione.")
+    audio_file = update.message.audio or update.message.voice
 
-        send_log_to_user(user_id, f"Pulizia dell'audio iniziata per il file: {file_path}")
+    if not audio_file:
+        await update.message.reply_text("Non ho ricevuto un file audio. Riprova.")
+        return TRANS_WAITING_FOR_AUDIO
 
-        # Carica il file audio
-        audio = AudioSegment.from_file(file_path)
-        send_log_to_user(user_id, f"Audio caricato con successo. Durata: {len(audio)} ms")
+    file = await audio_file.get_file()
+    file_path = await file.download_to_drive(custom_path="tmp/audio_to_transcribe.ogg")
+    context.user_data['transcribe_audio_file_path'] = file_path
+    logger.info(f"File audio salvato temporaneamente: {file_path}")
 
-        if len(audio) == 0:
-            send_log_to_user(user_id, "L'audio è vuoto.")
-            return None
+    await update.message.reply_text("Grazie! Ora per favore, inviami il nome che vuoi assegnare alla trascrizione.")
+    return TRANS_WAITING_FOR_FILENAME
 
-        # Normalizzazione del volume
-        send_log_to_user(user_id, "Normalizzazione del volume in corso...")
-        normalized_audio = audio.normalize()
+# Funzione per ricevere il nome del file e avviare la trascrizione
+async def transcribe_receive_filename(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Ricevuto nome file per trascrizione da {update.effective_user.first_name}.")
+    filename = update.message.text.strip()
+    context.user_data['transcribe_filename'] = filename
 
-        # Salva e invia il file audio dopo la normalizzazione
-        temp_norm_audio_path = os.path.join("tmp", f"{output_filename}_normalized.mp3")
-        normalized_audio.export(temp_norm_audio_path, format="mp3")
-        send_audio_to_user(user_id, temp_norm_audio_path, "Audio dopo la normalizzazione")
+    transcript = transcribe_audio_with_whisper(context.user_data['transcribe_audio_file_path'], language="it")
+    
+    if transcript:
+        await update.message.reply_text(f"Trascrizione completata: {transcript}")
+    else:
+        await update.message.reply_text("Si è verificato un errore durante la trascrizione dell'audio.")
+        logger.error("Errore durante la trascrizione dell'audio.")
+    
+    return ConversationHandler.END
 
-        # Converti in un array NumPy
-        y = np.array(normalized_audio.get_array_of_samples(), dtype=np.float32)
-        y /= np.max(np.abs(y))
-        send_log_to_user(user_id, f"Audio convertito in formato NumPy e normalizzato. Valore massimo: {np.max(y)}")
+##################
+# Pulizia Audio  #
+##################
 
-        # Riduzione del rumore
-        send_log_to_user(user_id, f"Riduzione del rumore in corso con fattore di riduzione: {noise_factor}")
-        y_denoised = nr.reduce_noise(y=y, sr=normalized_audio.frame_rate, prop_decrease=noise_factor)
-        send_log_to_user(user_id, f"Riduzione del rumore completata. Valore massimo: {np.max(y_denoised)}")
+# Funzione per il comando /clean
+async def clean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Comando /clean ricevuto da {update.effective_user.first_name}.")
+    await update.message.reply_text("Per favore, inviami il file audio che desideri pulire.")
+    return CLEAN_WAITING_FOR_AUDIO
 
-        # Salva e invia il file audio dopo la riduzione del rumore
-        temp_denoised_audio_path = os.path.join("tmp", f"{output_filename}_denoised.mp3")
-        denoised_audio = AudioSegment(
-            y_denoised.tobytes(), 
-            frame_rate=normalized_audio.frame_rate, 
-            sample_width=2, 
-            channels=1
-        )
-        denoised_audio.export(temp_denoised_audio_path, format="mp3")
-        send_audio_to_user(user_id, temp_denoised_audio_path, "Audio dopo la riduzione del rumore")
+# Funzione per ricevere il file audio nella pulizia
+async def clean_handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Ricevuto file audio da {update.effective_user.first_name} per la pulizia.")
+    audio_file = update.message.audio or update.message.voice
 
-        # Applicazione dei filtri Butterworth
-        send_log_to_user(user_id, "Inizio applicazione del filtro high-pass.")
-        y_filtered_hp = butter_filter(y_denoised, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='high')
-        send_log_to_user(user_id, f"Filtro high-pass applicato. Valore massimo: {np.max(y_filtered_hp)}")
+    if not audio_file:
+        await update.message.reply_text("Non ho ricevuto un file audio. Riprova.")
+        return CLEAN_WAITING_FOR_AUDIO
 
-        # Salva e invia il file audio dopo il filtro high-pass
-        temp_hp_audio_path = os.path.join("tmp", f"{output_filename}_highpass.mp3")
-        hp_audio = AudioSegment(
-            y_filtered_hp.tobytes(), 
-            frame_rate=normalized_audio.frame_rate, 
-            sample_width=2, 
-            channels=1
-        )
-        hp_audio.export(temp_hp_audio_path, format="mp3")
-        send_audio_to_user(user_id, temp_hp_audio_path, "Audio dopo il filtro high-pass")
+    file = await audio_file.get_file()
+    file_path = await file.download_to_drive(custom_path="tmp/audio_to_clean.ogg")
+    context.user_data['clean_audio_file_path'] = file_path
+    logger.info(f"File audio salvato temporaneamente: {file_path}")
 
-        send_log_to_user(user_id, "Inizio applicazione del filtro low-pass.")
-        y_filtered_lp = butter_filter(y_filtered_hp, low_cutoff, high_cutoff, normalized_audio.frame_rate, btype='low')
-        send_log_to_user(user_id, f"Filtro low-pass applicato. Valore massimo: {np.max(y_filtered_lp)}")
+    await update.message.reply_text("Grazie! Ora per favore, inviami il nome che vuoi assegnare al file pulito.")
+    return CLEAN_WAITING_FOR_FILENAME
 
-        # Salva e invia il file audio dopo il filtro low-pass
-        temp_lp_audio_path = os.path.join("tmp", f"{output_filename}_lowpass.mp3")
-        lp_audio = AudioSegment(
-            y_filtered_lp.tobytes(), 
-            frame_rate=normalized_audio.frame_rate, 
-            sample_width=2, 
-            channels=1
-        )
-        lp_audio.export(temp_lp_audio_path, format="mp3")
-        send_audio_to_user(user_id, temp_lp_audio_path, "Audio dopo il filtro low-pass")
+# Funzione per ricevere il nome del file e avviare la pulizia
+async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    filename = update.message.text.strip()
+    context.user_data['clean_filename'] = filename
+    logger.info(f"Nome file ricevuto: {filename}")
 
-        # Controlla se l'audio è silenzioso
-        if np.max(np.abs(y_filtered_lp)) == 0:
-            send_log_to_user(user_id, "Il segnale audio è completamente silenzioso, possibile problema nel processo.")
-            return None
+    # Avvia la pulizia dell'audio e invia l'audio in fasi
+    await update.message.reply_text("Inizio pulizia dell'audio...")
+    
+    # Prima fase: Normalizzazione
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, step='normalize')
+    if cleaned_audio_path:
+        with open(cleaned_audio_path, 'rb') as audio_file:
+            await update.message.reply_audio(audio=audio_file, caption="Audio dopo la normalizzazione")
+    
+    # Seconda fase: Riduzione rumore
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, step='denoise')
+    if cleaned_audio_path:
+        with open(cleaned_audio_path, 'rb') as audio_file:
+            await update.message.reply_audio(audio=audio_file, caption="Audio dopo la riduzione del rumore")
+    
+    # Terza fase: Filtro High-pass
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, step='highpass')
+    if cleaned_audio_path:
+        with open(cleaned_audio_path, 'rb') as audio_file:
+            await update.message.reply_audio(audio=audio_file, caption="Audio dopo il filtro high-pass")
+    
+    # Quarta fase: Filtro Low-pass
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, step='lowpass')
+    if cleaned_audio_path:
+        with open(cleaned_audio_path, 'rb') as audio_file:
+            await update.message.reply_audio(audio=audio_file, caption="Audio dopo il filtro low-pass")
+    
+    if cleaned_audio_path:
+        logger.info(f"Pulizia dell'audio completata per {update.effective_user.first_name}. File salvato in {cleaned_audio_path}.")
+        await update.message.reply_text("Pulizia dell'audio completata!")
 
-        # Salva l'audio pulito finale
-        output_path = os.path.join("tmp", f"{output_filename}.mp3")
-        cleaned_audio = AudioSegment(
-            y_filtered_lp.tobytes(), 
-            frame_rate=normalized_audio.frame_rate, 
-            sample_width=2, 
-            channels=1
-        )
-        cleaned_audio.export(output_path, format="mp3")
-        send_log_to_user(user_id, f"Audio pulito salvato correttamente come MP3: {output_path}")
-        send_audio_to_user(user_id, output_path, "Audio pulito finale")
+        # Rimuovi i file temporanei
+        os.remove(cleaned_audio_path)
+        os.remove(context.user_data['clean_audio_file_path'])
+        logger.info(f"File audio temporaneo {cleaned_audio_path} rimosso.")
+    else:
+        await update.message.reply_text("Si è verificato un errore durante la pulizia dell'audio.")
+        logger.error("Errore durante la pulizia dell'audio.")
+    
+    return ConversationHandler.END
 
-        return output_path
+##########################
+# Funzione di cancellazione #
+##########################
 
-    except Exception as e:
-        send_log_to_user(user_id, f"Errore durante la pulizia dell'audio: {e}")
-        logger.error(f"Errore durante la pulizia dell'audio: {e}")
-        return None
-
-# Esempio di utilizzo
-if __name__ == "__main__":
-    user_id = 'USER_TELEGRAM_ID'  # Identificatore dell'utente Telegram
-    cleaned_audio_path = clean_audio('input_audio.wav', 'output_audio', user_id)
+# Funzione per annullare la conversazione
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Conversazione annullata da {update.effective_user.first_name}.")
+    await update.message.reply_text('Operazione annullata.')
+    return ConversationHandler.END
