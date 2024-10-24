@@ -103,8 +103,11 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['clean_filename'] = filename
     logger.info(f"Nome file ricevuto: {filename}")
 
-    # Avvia la pulizia dell'audio passando il file di configurazione
-    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename)
+    # Recupera l'ID dell'utente
+    user_id = update.effective_user.id
+
+    # Avvia la pulizia dell'audio passando l'ID dell'utente
+    cleaned_audio_path = clean_audio(context.user_data['clean_audio_file_path'], filename, user_id)
 
     if cleaned_audio_path:
         logger.info(f"Pulizia dell'audio completata per {update.effective_user.first_name}. File salvato in {cleaned_audio_path}.")
@@ -120,7 +123,6 @@ async def clean_receive_filename(update: Update, context: ContextTypes.DEFAULT_T
         logger.error("Errore durante la pulizia dell'audio.")
     
     return ConversationHandler.END
-
 
 
 ##########################
