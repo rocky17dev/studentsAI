@@ -6,7 +6,7 @@ from scipy.signal import butter, filtfilt
 from pydub import AudioSegment
 import noisereduce as nr
 from utils import logger
-from bot_utils import send_log_to_user, send_audio_to_user  # Importa solo bot_utils
+from bot.bot_utils import send_log_to_user, send_audio_to_user 
 
 def butter_filter(data, lowcut, highcut, fs, btype='low'):
     try:
